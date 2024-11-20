@@ -9,7 +9,7 @@ MTRACE	   ?= $(QEMU)
 HW	   ?= qemu
 EXCEPTIONS ?= y
 RUN	   ?= $(empty)
-PYTHON     ?= python
+PYTHON     ?= python2
 O  	   = o.$(HW)
 
 ifeq ($(HW),linux)
@@ -26,29 +26,31 @@ endif
 
 ifdef USE_CLANG
 CC  = $(TOOLPREFIX)clang
-CXX = $(TOOLPREFIX)clang++ 
-CXXFLAGS = -Wno-delete-non-virtual-dtor -Wno-gnu-designator -Wno-tautological-compare -Wno-unused-private-field
+CXX = $(TOOLPREFIX)clang++
+CXXFLAGS = -Wno-delete-non-virtual-dtor -Wno-gnu-designator -Wno-tautological-compare -Wno-unused-private-field -fno-pie
 CFLAGS   = -no-integrated-as
-ASFLAGS  = 
+ASFLAGS  =
 else
-CC  ?= $(TOOLPREFIX)gcc
-CXX ?= $(TOOLPREFIX)g++
-CXXFLAGS = -Wno-delete-non-virtual-dtor
+CC  = /usr/local/gcc-4.8.5/bin/gcc
+CXX = /usr/local/gcc-4.8.5/bin/g++
+# CC  ?= $(TOOLPREFIX)gcc
+# CXX ?= $(TOOLPREFIX)g++
+CXXFLAGS = -Wno-delete-non-virtual-dtor -fno-pie
 CFLAGS   =
 ASFLAGS  = -Wa,--divide
 endif
 
-LD = $(TOOLPREFIX)ld
-NM = $(TOOLPREFIX)nm
-OBJCOPY = $(TOOLPREFIX)objcopy
-STRIP = $(TOOLPREFIX)strip
+LD = ld
+NM = nm
+OBJCOPY = objcopy
+STRIP = strip
 
 ifeq ($(PLATFORM),xv6)
 INCLUDES  = --sysroot=$(O)/sysroot \
 	-iquote include -iquote$(O)/include \
 	-iquote libutil/include \
 	-Istdinc $(CODEXINC) -I$(QEMUSRC) \
-	-include param.h -include libutil/include/compiler.h
+	-include param.h -include libutil/include/compiler.h -I/root/include/
 COMFLAGS  = -static -DXV6_HW=$(HW) -DXV6 \
 	    -fno-builtin -fno-strict-aliasing -fno-omit-frame-pointer -fms-extensions \
 	    -mno-red-zone
@@ -60,14 +62,15 @@ COMFLAGS := -pthread -Wno-unused-result
 LDFLAGS := -pthread
 # No mere mortal can call ld correctly on a real machine, so use gcc's
 # link driver instead.
-LD = $(TOOLPREFIX)gcc
+LD = /usr/local/gcc-4.8.5/bin/gcc
+# LD = $(TOOLPREFIX)gcc
 endif
 COMFLAGS += -g -MD -MP -O3 -Wall -Werror -DHW_$(HW) $(INCLUDES)
 CFLAGS   := $(COMFLAGS) -std=c99 $(CFLAGS)
 CXXFLAGS := $(COMFLAGS) -std=c++0x -Wno-sign-compare $(CXXFLAGS)
 ASFLAGS  := $(ASFLAGS) -Iinclude -I$(O)/include -m64 -gdwarf-2 -MD -MP -DHW_$(HW) -include param.h
 
-ALL := 
+ALL :=
 all:
 
 define SYSCALLGEN
@@ -134,7 +137,8 @@ FSEXTRA += README
 
 $(O)/fs.img: $(O)/tools/mkfs $(FSEXTRA) $(UPROGS)
 	@echo "  MKFS   $@"
-	$(Q)$(O)/tools/mkfs $@ $(FSEXTRA) $(UPROGS)
+	@g++ -o o.qemu/bin/pf_scale bin/pf_scale.cc -static -lm -lpthread
+	$(Q)$(O)/tools/mkfs $@ $(FSEXTRA) o.qemu/bin/pf_scale $(UPROGS)
 
 .PRECIOUS: $(O)/%.o
 .PHONY: clean qemu gdb rsync codex
@@ -143,10 +147,10 @@ $(O)/fs.img: $(O)/tools/mkfs $(FSEXTRA) $(UPROGS)
 ## qemu
 ##
 QEMUOPTS = -smp $(QEMUSMP) -m 512 -serial mon:stdio -nographic \
-	-numa node -numa node \
-	-net user -net nic,model=e1000 \
-	-redir tcp:2323::23 -redir tcp:8080::80 \
-	$(if $(RUN),-append "\$$ $(RUN)",)
+	-netdev user,id=ethernet.0,hostfwd=tcp::2323-:23,hostfwd=tcp::8080-:80 \
+	-device e1000,netdev=ethernet.0 \
+	$(if $(RUN),-append "\$$ $(RUN)",) \
+	# -numa node -numa node \
 
 qemu: $(KERN)
 	$(QEMU) $(QEMUOPTS) $(QEMUKVMFLAGS) -kernel $(KERN)
@@ -166,7 +170,7 @@ mscan.kern: $(KERN)
 
 MTRACEOPTS = -rtc clock=vm -mtrace-enable -mtrace-file mtrace.out \
 	     -mtrace-quantum 100 -mtrace-calls
-mtrace.out: mscan.kern mscan.syms 
+mtrace.out: mscan.kern mscan.syms
 	$(Q)rm -f mtrace.out
 	$(MTRACE) $(QEMUOPTS) $(MTRACEOPTS) -kernel mscan.kern -s
 .PHONY: mtrace.out
@@ -202,7 +206,7 @@ setup-linux:
 bench:
 	/bin/echo -ne "xv6\\nbench\\nexit\\n" | nc $(HW).csail.mit.edu 23
 
-clean: 
+clean:
 	rm -fr $(O)
 
 all:	$(ALL)
