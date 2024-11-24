@@ -39,7 +39,7 @@ enum { fault = 1 };
 
 enum class bench_mode
 {
-  LOCAL, PIPELINE, GLOBAL, GLOBAL_FIXED
+  LOCAL, PIPELINE, GLOBAL, GLOBAL_FIXED, PF_SCALE, MMAP_SCALE,
 };
 
 // XXX(Austin) Do this right.  Put these in a proper PMC library.
@@ -359,6 +359,14 @@ thr(void *arg)
     }
     break;
   }
+
+  case bench_mode::PF_SCALE: {
+    break;
+  }
+
+  case bench_mode::MMAP_SCALE: {
+    break;
+  }
   }
   stop_tscs[cpu] = rdtsc();
   start_tscs[cpu] = tsc1;
@@ -400,7 +408,7 @@ int
 main(int argc, char **argv)
 {
   if (argc < 3)
-    die("usage: %s nthreads local|pipeline|global [npg]", argv[0]);
+    die("usage: %s nthreads local|pipeline|global|pf_scale|mmap_scale [npg]", argv[0]);
 
   nthread = atoi(argv[1]);
 
@@ -412,6 +420,10 @@ main(int argc, char **argv)
     mode = bench_mode::GLOBAL;
   else if (strcmp(argv[2], "global-fixed") == 0)
     mode = bench_mode::GLOBAL_FIXED;
+  else if (strcmp(argv[2], "pf_scale") == 0)
+    mode = bench_mode::PF_SCALE;
+  else if (strcmp(argv[2], "mmap_scale") == 0)
+    mode = bench_mode::MMAP_SCALE;
   else
     die("bad mode argument");
 
@@ -427,7 +439,9 @@ main(int argc, char **argv)
          mode == bench_mode::LOCAL ? "local" :
          mode == bench_mode::PIPELINE ? "pipeline" :
          mode == bench_mode::GLOBAL ? "global" :
-         mode == bench_mode::GLOBAL_FIXED ? "global-fixed" : "UNKNOWN",
+         mode == bench_mode::GLOBAL_FIXED ? "global-fixed" :
+         mode == bench_mode::PF_SCALE ? "pf_scale" :
+         mode == bench_mode::MMAP_SCALE ? "mmap_scale" : "UNKNOWN",
          fault ? "true" : "false");
   if (mode == bench_mode::GLOBAL_FIXED)
     printf(" --totalpg=%d", npg);

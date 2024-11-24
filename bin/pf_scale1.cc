@@ -75,8 +75,10 @@ typedef struct {
 	int nr_workers;
 } thread_data_t;
 
-static pthread_barrier_t bar;
-static uint64_t start_tscs[NCPU], end_tscs[NCPU];
+int DISPATCH_LIGHT;
+int FINISHED_WORKERS;
+long THREAD_TOTAL_TIME;
+uint64_t time_end;
 
 void *worker_thread(void *arg)
 {
@@ -89,11 +91,14 @@ void *worker_thread(void *arg)
 	size_t pages_per_thread = data->pages / data->num_threads;
 	size_t start_page = data->thread_id * pages_per_thread;
 	size_t end_page = start_page + pages_per_thread;
+	int nr_workers = data->nr_workers;
 
 	uint64_t thread_time_start, thread_time_end;
 
-	// Wait for all threads are ready
-	pthread_barrier_wait(&bar);
+	// Wait for the main thread to signal that all threads are ready
+	while (__atomic_load_n(&DISPATCH_LIGHT, __ATOMIC_ACQUIRE) == 0) {
+		yield();
+	}
 
 	thread_time_start = rdtsc();
 
@@ -101,10 +106,15 @@ void *worker_thread(void *arg)
 		data->region[i * PAGE_SIZE] = 1; // Trigger page fault
 	}
 
-
 	thread_time_end = rdtsc();
-	start_tscs[data->thread_id] = thread_time_start;
-	end_tscs[data->thread_id] = thread_time_end;
+	long time = get_time_in_cycles(thread_time_start, thread_time_end);
+
+	if (__atomic_add_fetch(&FINISHED_WORKERS, 1, __ATOMIC_RELEASE) ==
+	    nr_workers) {
+		time_end = thread_time_end;
+	}
+
+	__atomic_add_fetch(&THREAD_TOTAL_TIME, time, __ATOMIC_RELEASE);
 
 	return NULL;
 }
@@ -119,15 +129,20 @@ void run_test(test_result_t *result, int num_threads)
 	pthread_t threads[num_threads];
 	thread_data_t thread_data[num_threads];
 
-	pthread_barrier_init(&bar, 0, num_threads);
-
-	char *region = (char*)mmap(0, NUM_PAGES * PAGE_SIZE, PROT_READ | PROT_WRITE,
+	char *region = (char*)mmap(NULL, NUM_PAGES * PAGE_SIZE, PROT_READ | PROT_WRITE,
 			    MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
 
 	if (region == MAP_FAILED) {
 		die("mmap failed");
 		exit(EXIT_FAILURE);
 	}
+
+	// Initialize global variables
+	__atomic_clear(&DISPATCH_LIGHT, __ATOMIC_RELEASE);
+	__atomic_store_n(&FINISHED_WORKERS, 0, __ATOMIC_RELEASE);
+	__atomic_store_n(&THREAD_TOTAL_TIME, 0, __ATOMIC_RELEASE);
+
+	uint64_t start;
 
 	// Create threads and trigger page faults in parallel
 	for (int i = 0; i < num_threads; i++) {
@@ -137,30 +152,38 @@ void run_test(test_result_t *result, int num_threads)
 		thread_data[i].num_threads = num_threads;
 		thread_data[i].nr_workers = num_threads;
 
-		if (xthread_create(&threads[i], 0, worker_thread, &thread_data[i]) != 0) {
+		// Set the thread affinity to a specific core
+		if (setaffinity(get_cpu_order(i)) < 0) {
+			die("setaffinity err");
+			exit(EXIT_FAILURE);
+		}
+
+		if (xthread_create(&threads[i], 0, worker_thread,
+				   &thread_data[i]) != 0) {
 			die("pthread_create failed");
 			exit(EXIT_FAILURE);
 		}
 	}
+	if (setaffinity(get_cpu_order(0)) < 0) {
+	    die("setaffinity err");
+		exit(EXIT_FAILURE);
+	}
+
+	// Signal all threads to start
+	start = rdtsc();
+	__atomic_store_n(&DISPATCH_LIGHT, 1, __ATOMIC_RELEASE);
 
 	// Join threads
 	for (int i = 0; i < num_threads; i++) {
 		xpthread_join(threads[i]);
 	}
 
-	uint64_t real_start = start_tscs[0], real_end = end_tscs[0], thread_total_time = 0;
-	for(int i = 0; i < num_threads; i++) {
-		if (start_tscs[i] < real_start) real_start = start_tscs[i];
-		if (end_tscs[i] > real_end) real_end = end_tscs[i];
-		thread_total_time += get_time_in_cycles(start_tscs[i], end_tscs[i]);
-	}
-
-	result->completion_time = get_time_in_cycles(real_start, real_end);
+	result->completion_time = get_time_in_cycles(start, time_end);
+	long thread_total_time =
+		__atomic_load_n(&THREAD_TOTAL_TIME, __ATOMIC_ACQUIRE);
 	result->per_thread_time = thread_total_time / num_threads;
 
-	// if (munmap((void*)region, NUM_PAGES * PAGE_SIZE) < 0)
-    //   die("munmap failed");
-	// 这里挂了？？？？？？？？？？？
+	munmap(region, NUM_PAGES * PAGE_SIZE);
 }
 
 void run_multiple_avg_test(int num_threads)
