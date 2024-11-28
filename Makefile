@@ -4,6 +4,7 @@ Q          ?= @
 TOOLPREFIX ?= x86_64-jos-elf-
 QEMU 	   ?= qemu-system-x86_64
 QEMUSMP	   ?= 8
+QEMUMEM    ?= 8G
 QEMUSRC    ?= ../mtrace
 MTRACE	   ?= $(QEMU)
 HW	   ?= qemu
@@ -137,8 +138,7 @@ FSEXTRA += README
 
 $(O)/fs.img: $(O)/tools/mkfs $(FSEXTRA) $(UPROGS)
 	@echo "  MKFS   $@"
-	@g++ -o o.qemu/bin/pf_scale bin/pf_scale.cc -static -lm -lpthread
-	$(Q)$(O)/tools/mkfs $@ $(FSEXTRA) o.qemu/bin/pf_scale $(UPROGS)
+	$(Q)$(O)/tools/mkfs $@ $(FSEXTRA) $(UPROGS)
 
 .PRECIOUS: $(O)/%.o
 .PHONY: clean qemu gdb rsync codex
@@ -146,7 +146,7 @@ $(O)/fs.img: $(O)/tools/mkfs $(FSEXTRA) $(UPROGS)
 ##
 ## qemu
 ##
-QEMUOPTS = -smp $(QEMUSMP) -m 512 -serial mon:stdio -nographic \
+QEMUOPTS = -smp $(QEMUSMP) -m ${QEMUMEM} -serial mon:stdio -nographic \
 	-netdev user,id=ethernet.0,hostfwd=tcp::2323-:23,hostfwd=tcp::8080-:80 \
 	-device e1000,netdev=ethernet.0 \
 	$(if $(RUN),-append "\$$ $(RUN)",) \
