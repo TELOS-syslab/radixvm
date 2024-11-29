@@ -56,11 +56,14 @@ UPROGS_BIN= \
 	base64 \
 	tee \
         ln \
-	scale_pf \
-	scale_mmap \
-	scale_munmap \
+	s_mmap \
+	s_pf_d \
+	s_pf_r \
+	s_munmap_d \
+	s_munmap_r \
 	mmap_fork \
 	mmap_fork_e \
+	# vvsvtest \
 
 ifeq ($(HAVE_LWIP),y)
 UPROGS_BIN += \

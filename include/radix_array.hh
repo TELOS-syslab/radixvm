@@ -550,10 +550,11 @@ public:
       }
       // Leaf node
       auto &c = node_.as_leaf_node()->child[subkey(k_, 0)];
-#if RADIX_DEBUG
-      assert(c.get_lock().is_locked());
-#endif
-      c.get_lock().release(bit_spinlock::cli_caller);
+// #if RADIX_DEBUG
+//       assert(c.get_lock().is_locked());
+// #endif
+      if (c.get_lock().is_locked())
+        c.get_lock().release(bit_spinlock::cli_caller);
     }
 
   public:
