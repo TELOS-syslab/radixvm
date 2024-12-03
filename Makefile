@@ -3,8 +3,8 @@
 Q          ?= @
 TOOLPREFIX ?= x86_64-jos-elf-
 QEMU 	   ?= qemu-system-x86_64
-QEMUSMP	   ?= 8
-QEMUMEM    ?= 8G
+QEMUSMP	   ?= 128
+QEMUMEM    ?= 96G
 QEMUSRC    ?= ../mtrace
 MTRACE	   ?= $(QEMU)
 HW	   ?= qemu

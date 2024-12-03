@@ -22,3 +22,4 @@ lwip
 cscope.out
 cscope.files
 tags
+metis/obj/
