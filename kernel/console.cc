@@ -57,7 +57,7 @@ consputc(int c)
     uartputc('\r');
     // fall through
   default:
-    uartputc(c);    
+    uartputc(c);
   }
 
   cgaputc(c);
@@ -186,6 +186,7 @@ printtrap(struct trapframe *tf, bool lock)
     kstack = myproc()->kstack;
   }
 
+  // here
   __cprintf("trap %lu err 0x%x cpu %u cs %u ds %u ss %u\n"
             // Basic machine state
             "  rip %016lx rsp %016lx rbp %016lx\n"

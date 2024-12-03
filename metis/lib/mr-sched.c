@@ -229,12 +229,12 @@ mr_run_scheduler(mr_param_t * param)
     map_time = read_tsc() - start_time;
     if (!mr_state.skip_reduce_phase) {
 	// reduce phase
-        printf("done with map\n");
+        // printf("done with map\n");
 	start_time = read_tsc();
 	mr_run_task(REDUCE);
 	reduce_time = read_tsc() - start_time;
     }
-    printf("done with map and reduce\n");
+    // printf("done with map and reduce\n");
     // merge phase
     start_time = read_tsc();
     if (use_psrs) {
@@ -266,30 +266,32 @@ mr_print_stats(void)
     uint64_t sum_time =
 	total_sample_time + total_map_time + total_reduce_time +
 	total_merge_time;
-#define SEP "\t"
-    printf("Runtime in millisecond [%d cores]\n\t",
-	   mr_state.mr_fixed.nr_cpus);
-    printf("Sample:\t%" PRIu64 SEP,
-	   total_sample_time * 1000 / get_cpu_freq());
-    printf("Map:\t%" PRIu64 SEP, total_map_time * 1000 / get_cpu_freq());
-    printf("Reduce:\t%" PRIu64 SEP,
-	   total_reduce_time * 1000 / get_cpu_freq());
-    printf("Merge:\t%" PRIu64 SEP, total_merge_time * 1000 / get_cpu_freq());
-    printf("Sum:\t%" PRIu64 SEP, sum_time * 1000 / get_cpu_freq());
-    printf("Real:\t%" PRIu64 SEP, total_real_time * 1000 / get_cpu_freq());
-    printf("\nNumber of Tasks\n\t");
-    if (the_app.atype == atype_maponly) {
-	printf("Map:\t%" PRIu64 SEP, presplitter_nsplits(&mr_state.ps));
-    } else {
-	printf("Sample:\t%" PRIu64 SEP, mr_state.nsampled_splits);
-	printf("Map:\t%" PRIu64 SEP, presplitter_nsplits(&mr_state.ps) -
-	       mr_state.nsampled_splits);
-	printf("Reduce:\t%" PRIu32 SEP, the_app.mapgr.tasks);
-    }
-    printf("\n");
-#if XV6_USER
-    printf("PT pages: %" PRIu64 "\n", pt_pages());
-#endif
+
+    printf("%d, %ld\n", mr_state.mr_fixed.nr_cpus, sum_time * 1000 / get_cpu_freq());
+// #define SEP "\t"
+//     printf("Runtime in millisecond [%d cores]\n\t",
+// 	   mr_state.mr_fixed.nr_cpus);
+//     printf("Sample:\t%" PRIu64 SEP,
+// 	   total_sample_time * 1000 / get_cpu_freq());
+//     printf("Map:\t%" PRIu64 SEP, total_map_time * 1000 / get_cpu_freq());
+//     printf("Reduce:\t%" PRIu64 SEP,
+// 	   total_reduce_time * 1000 / get_cpu_freq());
+//     printf("Merge:\t%" PRIu64 SEP, total_merge_time * 1000 / get_cpu_freq());
+//     printf("Sum:\t%" PRIu64 SEP, sum_time * 1000 / get_cpu_freq());
+//     printf("Real:\t%" PRIu64 SEP, total_real_time * 1000 / get_cpu_freq());
+//     printf("\nNumber of Tasks\n\t");
+//     if (the_app.atype == atype_maponly) {
+// 	printf("Map:\t%" PRIu64 SEP, presplitter_nsplits(&mr_state.ps));
+//     } else {
+// 	printf("Sample:\t%" PRIu64 SEP, mr_state.nsampled_splits);
+// 	printf("Map:\t%" PRIu64 SEP, presplitter_nsplits(&mr_state.ps) -
+// 	       mr_state.nsampled_splits);
+// 	printf("Reduce:\t%" PRIu32 SEP, the_app.mapgr.tasks);
+//     }
+//     printf("\n");
+// #if XV6_USER
+//     printf("PT pages: %" PRIu64 "\n", pt_pages());
+// #endif
 }
 
 void

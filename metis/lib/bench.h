@@ -131,6 +131,9 @@ get_cpu_freq(void)
     char *line = NULL;
     size_t len = 0;
 
+    // TELOS: Hardcoded CPU frequency
+    return 1900 * 1000000UL;
+
     fd = fopen("/proc/cpuinfo", "r");
     if (!fd) {
 	fprintf(stderr, "failed to get cpu frequecy\n");

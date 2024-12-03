@@ -4,7 +4,8 @@ Q          ?= @
 TOOLPREFIX ?= x86_64-jos-elf-
 QEMU 	   ?= qemu-system-x86_64
 QEMUSMP	   ?= 128
-QEMUMEM    ?= 96G
+QEMUMEM    ?= 48G
+QMP_PORT   = 9889
 QEMUSRC    ?= ../mtrace
 MTRACE	   ?= $(QEMU)
 HW	   ?= qemu
@@ -147,10 +148,14 @@ $(O)/fs.img: $(O)/tools/mkfs $(FSEXTRA) $(UPROGS)
 ## qemu
 ##
 QEMUOPTS = -smp $(QEMUSMP) -m ${QEMUMEM} -serial mon:stdio -nographic \
+	-machine q35,kernel-irqchip=split \
 	-netdev user,id=ethernet.0,hostfwd=tcp::2323-:23,hostfwd=tcp::8080-:80 \
 	-device e1000,netdev=ethernet.0 \
 	$(if $(RUN),-append "\$$ $(RUN)",) \
+	-qmp tcp:127.0.0.1:${QMP_PORT},server,nowait \
 	# -numa node -numa node \
+
+QEMUKVMFLAGS = --enable-kvm
 
 qemu: $(KERN)
 	$(QEMU) $(QEMUOPTS) $(QEMUKVMFLAGS) -kernel $(KERN)

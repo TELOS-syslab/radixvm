@@ -130,18 +130,18 @@ map(split_t * args)
 static void
 print_top(final_data_kvs_len_t * wc_vals, int ndisp)
 {
-    uint64_t occurs = 0;
-    for (uint32_t i = 0; i < wc_vals->length; i++) {
-	keyvals_len_t *curr = &wc_vals->data[i];
-	occurs += (uint64_t) curr->len;
-    }
-    printf("\nwordreverseindex: results (TOP %d from %zu keys, %" PRIu64
-	   " words):\n", ndisp, wc_vals->length, occurs);
-    for (uint32_t i = 0; i < (uint32_t) ndisp && i < wc_vals->length; i++) {
-	keyvals_len_t *curr = &wc_vals->data[i];
-	printf("%15s - %d\n", (char *) curr->key,
-	       (unsigned) (size_t) curr->len);
-    }
+    // uint64_t occurs = 0;
+    // for (uint32_t i = 0; i < wc_vals->length; i++) {
+	// keyvals_len_t *curr = &wc_vals->data[i];
+	// occurs += (uint64_t) curr->len;
+    // }
+    // printf("\nwordreverseindex: results (TOP %d from %zu keys, %" PRIu64
+	//    " words):\n", ndisp, wc_vals->length, occurs);
+    // for (uint32_t i = 0; i < (uint32_t) ndisp && i < wc_vals->length; i++) {
+	// keyvals_len_t *curr = &wc_vals->data[i];
+	// printf("%15s - %d\n", (char *) curr->key,
+	//        (unsigned) (size_t) curr->len);
+    // }
 }
 
 static void *

@@ -40,5 +40,5 @@ int main(int argc, char *argv[])
 			   (test_config_t){ .num_prealloc_pages_per_thread =
 						    NUM_PAGES,
 					    .trigger_fault_before_spawn = 0,
-					    .rand_assign_pages = 1 });
+					    .rand_assign_pages = 1, .show_pt_pages = 0 });
 }

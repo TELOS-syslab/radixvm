@@ -25,19 +25,19 @@
 #endif
 
 #define PAGE_SIZE 4096 // Typical page size in bytes
-#define MAX_PAGES 262144
-#define WARMUP_ITERATIONS 64
-#define TEST_ITERATIONS 64
+#define MAX_PAGES (1<<23) // 32G
+// #define MAX_PAGES (1<<18) // 1G
+#define TEST_ITERATIONS 20
 
 long get_time_in_nanos(long start_tsc, long end_tsc)
 {
-	// Assume a 2.6 GHz CPU
-	return (end_tsc - start_tsc) / 2.6;
+	// Our setup is a 1.9 GHz CPU
+	return (end_tsc - start_tsc) * 10 / 19;
 }
 
 long run_test(int num_pages)
 {
-	int region_size = num_pages * PAGE_SIZE;
+	size_t region_size = (size_t)num_pages * (size_t)PAGE_SIZE;
 
 	char *region = (char*)mmap(0, region_size, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
 	if (region == MAP_FAILED) {
@@ -76,28 +76,16 @@ long lat[TEST_ITERATIONS];
 
 int main(int argc, char *argv[])
 {
-	printf("Pages, Min lat (ns), Avg lat (ns), Max lat (ns), Pos err lat (ns2), Neg err lat (ns2)\n");
+	printf("Pages, p5 lat (ns), Avg lat (ns), p95 lat (ns), Pos err lat (ns2), Neg err lat (ns2)\n");
 
 	for (int num_pages = 1; num_pages <= MAX_PAGES; num_pages <<= 1) {
-		for (int i = 0; i < WARMUP_ITERATIONS; i++) {
-			run_test(num_pages);
-		}
-
 		for (int i = 0; i < TEST_ITERATIONS; i++) {
 			lat[i] = run_test(num_pages);
 		}
 
-		// Calculate the maximum, minimum, average, and variance of the latencies
-		long max = 0;
-		long min = 0x7FFFFFFFFFFFFFFF;
+		// Calculate the p5, average, p95, and variance of the latencies
 		long avg = 0;
 		for (int i = 0; i < TEST_ITERATIONS; i++) {
-			if (lat[i] > max) {
-				max = lat[i];
-			}
-			if (lat[i] < min) {
-				min = lat[i];
-			}
 			avg += lat[i];
 		}
 		avg /= TEST_ITERATIONS;
@@ -118,9 +106,22 @@ int main(int argc, char *argv[])
 		posvar2 /= numpos;
 		negvar2 /= numneg;
 
-		printf("%d, %ld, %ld, %ld, %ld, %ld\n", num_pages,
-				min, avg, max,
-				posvar2, negvar2);
+		// Calculate the p5 and p95 latencies
+		// bubble sort
+		for (int i = 0; i < TEST_ITERATIONS; i++) {
+			for (int j = i + 1; j < TEST_ITERATIONS; j++) {
+				if (lat[i] > lat[j]) {
+					long temp = lat[i];
+					lat[i] = lat[j];
+					lat[j] = temp;
+				}
+			}
+		}
+		long p5 = lat[TEST_ITERATIONS / 20];
+		long p95 = lat[TEST_ITERATIONS * 19 / 20];
+
+		printf("%d, %ld, %ld, %ld, %ld, %ld\n", num_pages, p5, avg, p95,
+			posvar2, negvar2);
 	}
 
 	return 0;

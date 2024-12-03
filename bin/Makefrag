@@ -93,6 +93,9 @@ FSEXTRA += \
 	bin/metis_wrmem-ben \
 	bin/lsocket \
 	bin/countbench-ben \
+	bin/microbench \
+	bin/metisbench \
+	bin/ptcowbench \
 
 ifeq ($(PLATFORM),native)
 ALL += $(addprefix $(O)/bin/, $(UPROGS_NATIVE))
