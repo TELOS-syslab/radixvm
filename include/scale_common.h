@@ -84,7 +84,6 @@ typedef struct {
 	char *region;
 	// For random tests
 	int *page_idx;
-	size_t region_size;
 	int thread_id;
 	// Pass the result back to the main thread
 	long lat;
@@ -96,7 +95,6 @@ typedef struct {
 	size_t num_prealloc_pages_per_thread;
 	int trigger_fault_before_spawn;
 	int rand_assign_pages;
-	int show_pt_pages;
 } test_config_t;
 
 // Decls
@@ -108,9 +106,9 @@ void run_test_specify_threads(int num_threads, void *(*worker_thread)(void *),
 void run_test_specify_rounds(int num_threads, void *(*worker_thread)(void *),
 			     test_config_t config);
 void run_test_forked(int num_threads, void *(*worker_thread)(void *),
-		     test_config_t config, int run_id);
+		     test_config_t config);
 void run_test(int num_threads, void *(*worker_thread)(void *),
-	      test_config_t config, int run_id);
+	      test_config_t config);
 
 // Impls
 
@@ -159,7 +157,7 @@ void run_test_specify_rounds(int num_threads, void *(*worker_thread)(void *),
 
 	int runs = TOT_THREAD_RUNS / num_threads;
 	for (int run_id = 0; run_id < runs; run_id++) {
-		run_test_forked(num_threads, worker_thread, config, run_id);
+		run_test_forked(num_threads, worker_thread, config);
 	}
 
 	// Read latency data from RESULT_FILE
@@ -231,7 +229,7 @@ void run_test_specify_rounds(int num_threads, void *(*worker_thread)(void *),
 }
 
 void run_test_forked(int num_threads, void *(*worker_thread)(void *),
-		     test_config_t config, int run_id)
+		     test_config_t config)
 {
 	// Spawn a process for a test in order to avoid interference between tests
 	int pid = xfork();
@@ -240,7 +238,7 @@ void run_test_forked(int num_threads, void *(*worker_thread)(void *),
 		exit(EXIT_FAILURE);
 	} else if (pid == 0) {
 		// Child process
-		run_test(num_threads, worker_thread, config, run_id);
+		run_test(num_threads, worker_thread, config);
 		exit(EXIT_SUCCESS);
 	} else {
 		// Parent process
@@ -249,7 +247,7 @@ void run_test_forked(int num_threads, void *(*worker_thread)(void *),
 }
 
 void run_test(int num_threads, void *(*worker_thread)(void *),
-	      test_config_t config, int run_id)
+	      test_config_t config)
 {
 	size_t num_prealloc_pages = config.num_prealloc_pages_per_thread;
 	size_t num_tot_pages = num_prealloc_pages * num_threads;
@@ -300,7 +298,6 @@ void run_test(int num_threads, void *(*worker_thread)(void *),
 	for (int i = 0; i < num_threads; i++) {
 		thread_data[i].region = region;
 		thread_data[i].page_idx = page_idx;
-		thread_data[i].region_size = num_prealloc_pages * PAGE_SIZE;
 		thread_data[i].thread_id = i;
 
 		if (xthread_create(&threads[i], 0, worker_thread,
@@ -331,7 +328,4 @@ void run_test(int num_threads, void *(*worker_thread)(void *),
 		write(fd, &(thread_data[i].lat), sizeof(thread_data[i].lat));
 	}
 	close(fd);
-
-	if (config.show_pt_pages && run_id == 0)
-		printf("%lu PT pages\n", pt_pages());
 }

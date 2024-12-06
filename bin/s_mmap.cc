@@ -1,7 +1,6 @@
 #include "scale_common.h"
 
 #define NUM_MMAPS 512 // Number mmaps per thread
-#define NUM_PAGES (((NUM_MMAPS) * sizeof(char *) + (PAGE_SIZE)-1) / (PAGE_SIZE))
 
 void *worker_thread(void *arg)
 {
@@ -19,7 +18,7 @@ void *worker_thread(void *arg)
 
 	tsc_start = rdtsc();
 
-	// map them one by one, use preallocated region to store the pointers
+	// map them one by one
 	for (size_t i = 0; i < NUM_MMAPS; i++) {
 		mmap(0, PAGE_SIZE * 8, PROT_READ | PROT_WRITE,
 				 MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
@@ -37,5 +36,5 @@ int main(int argc, char *argv[])
 {
 	return entry_point(argc, argv, worker_thread,
 			   (test_config_t){ .num_prealloc_pages_per_thread = 1,
-					    .trigger_fault_before_spawn = 0, .rand_assign_pages = 0, .show_pt_pages = 0 });
+					    .trigger_fault_before_spawn = 0, .rand_assign_pages = 0 });
 }

@@ -1,9 +1,0 @@
-#!/sh
-
-echo "mmap_fork"
-./mmap_fork
-sleep 5
-
-echo "mmap_fork_exit"
-./mmap_fork_e
-sleep 5

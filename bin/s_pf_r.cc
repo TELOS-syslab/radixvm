@@ -18,7 +18,6 @@ void *worker_thread(void *arg)
 
 	tsc_start = rdtsc();
 
-	// unmap them one by one randomly
 	int *page_idx = data->page_idx + data->thread_id * NUM_PAGES;
 	for (size_t i = 0; i < NUM_PAGES; i++) {
 		char *region = data->region + page_idx[i] * PAGE_SIZE;
@@ -37,8 +36,6 @@ void *worker_thread(void *arg)
 int main(int argc, char *argv[])
 {
 	return entry_point(argc, argv, worker_thread,
-			   (test_config_t){ .num_prealloc_pages_per_thread =
-						    NUM_PAGES,
-					    .trigger_fault_before_spawn = 0,
-					    .rand_assign_pages = 1, .show_pt_pages = 0 });
+			   (test_config_t){ .num_prealloc_pages_per_thread = NUM_PAGES,
+					    .trigger_fault_before_spawn = 0, .rand_assign_pages = 1 });
 }

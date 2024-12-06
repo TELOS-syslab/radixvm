@@ -28,6 +28,8 @@ static __thread header* freelist[64];
 
 // Minimum allocation unit in multiples of sizeof(header)
 static size_t min_alloc_units = (256*1024) / sizeof(header);
+// static size_t min_alloc_units = 4 * 1024; // 64K
+// static size_t min_alloc_units = 512 * 1024; // 8M
 
 extern "C" void
 malloc_set_alloc_unit(size_t bytes)

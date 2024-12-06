@@ -11,12 +11,6 @@ void *worker_thread(void *arg)
 		exit(EXIT_FAILURE);
 	}
 
-	char *region = data->region + data->thread_id * NUM_PAGES * PAGE_SIZE;
-	// Trigger page fault on each page
-	for (size_t i = 0; i < NUM_PAGES; i++) {
-		region[i * PAGE_SIZE] = 1;
-	}
-
 	long tsc_start, tsc_end;
 
 	// Wait for that all threads are ready
@@ -25,6 +19,7 @@ void *worker_thread(void *arg)
 	tsc_start = rdtsc();
 
 	// unmap them one by one
+	char *region = data->region + data->thread_id * NUM_PAGES * PAGE_SIZE;
 	for (size_t i = 0; i < NUM_PAGES; i++) {
 		munmap(region + i * PAGE_SIZE, PAGE_SIZE);
 	}
@@ -42,5 +37,5 @@ int main(int argc, char *argv[])
 	return entry_point(argc, argv, worker_thread,
 			   (test_config_t){ .num_prealloc_pages_per_thread =
 						    NUM_PAGES,
-					    .trigger_fault_before_spawn = 0, .rand_assign_pages = 0, .show_pt_pages = 0 });
+					    .trigger_fault_before_spawn = 1, .rand_assign_pages = 0 });
 }

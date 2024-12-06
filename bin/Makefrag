@@ -61,10 +61,7 @@ UPROGS_BIN= \
 	s_pf_r \
 	s_munmap_d \
 	s_munmap_r \
-	mmap_fork \
-	mmap_fork_e \
 	s_mem \
-	# vvsvtest \
 
 ifeq ($(HAVE_LWIP),y)
 UPROGS_BIN += \
@@ -96,7 +93,6 @@ FSEXTRA += \
 	bin/countbench-ben \
 	bin/microbench \
 	bin/metisbench \
-	bin/ptcowbench \
 
 ifeq ($(PLATFORM),native)
 ALL += $(addprefix $(O)/bin/, $(UPROGS_NATIVE))
