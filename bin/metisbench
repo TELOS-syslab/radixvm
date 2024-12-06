@@ -1,6 +1,8 @@
 #!/sh
 
 ./metis_wrmem -s 200 -p 1;sleep 5
+./metis_wrmem -s 200 -p 2;sleep 5
+./metis_wrmem -s 200 -p 4;sleep 5
 ./metis_wrmem -s 200 -p 8;sleep 5
 ./metis_wrmem -s 200 -p 16;sleep 5
 ./metis_wrmem -s 200 -p 24;sleep 5

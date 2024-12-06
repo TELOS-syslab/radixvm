@@ -8,6 +8,9 @@
 
 #include "bit_spinlock.hh"
 
+#include "kstream.hh"
+static console_stream rdebug(0);
+
 #ifndef RADIX_DEBUG
 #define RADIX_DEBUG 1
 #endif
@@ -60,10 +63,12 @@ public:
   typename Base::pointer
   default_allocate()
   {
+    rdebug.println("++++");
     typename Base::pointer p = Base::allocate(1);
     try {
       Base::construct(p);
     } catch (...) {
+      rdebug.println("----");
       Base::deallocate(p, 1);
       throw;
     }
@@ -247,6 +252,12 @@ public:
   {
     // Free entire tree
     node_ptr(root_).free(this);
+  }
+
+  size_t total_size()
+  {
+    size_t ans = node_ptr(root_).total_size(this);
+    return ans;
   }
 
   radix_array(const radix_array &o) = delete;
@@ -1175,6 +1186,23 @@ private:
         break;
       }
     }
+
+    size_t total_size(radix_array *r)
+    {
+      switch (get_type()) {
+      case EXTERNAL:
+        return sizeof(value_type);
+      case UPPER:
+        return as_upper_node()->total_size(r);
+      case LEAF:
+        return as_leaf_node()->total_size(r);
+      case NONE:
+        return 0;
+      }
+      assert(0);
+      return -1;
+    }
+
   };
 
   /**
@@ -1250,6 +1278,7 @@ private:
       if (src.is_null() && !src.get_lock().is_locked()) {
         node = r->upper_node_alloc_.default_allocate();
       } else {
+        rdebug.println("++++");
         node = r->upper_node_alloc_.allocate(1);
         r->upper_node_alloc_.construct(node, r, src);
       }
@@ -1268,7 +1297,16 @@ private:
       // XXX We could pass this to
       // upper_node_alloc_.default_deallocate if we knew it was still
       // default-initialized.
+      rdebug.println("----");
       r->upper_node_alloc_.deallocate(this, 1);
+    }
+
+    size_t total_size(radix_array *r)
+    {
+      size_t ans = 0;
+      for (auto &c : child)
+        ans += node_ptr(c).total_size(r);
+      return ans + NodeBytes;
     }
   };
 
@@ -1320,6 +1358,7 @@ private:
       } else {
         // Allocate the node, but don't call it's constructor because
         // that would force us to default-initialize the child array.
+        rdebug.println("++++");
         node = r->leaf_node_alloc_.allocate(1);
 
         // Initialize child pointers.  If the source is_null, then we
@@ -1351,7 +1390,13 @@ private:
     void free(radix_array *r)
     {
       this->~leaf_node();
+      rdebug.println("----");
       r->leaf_node_alloc_.deallocate(this, 1);
+    }
+
+    size_t total_size(radix_array *r)
+    {
+      return NodeBytes;
     }
 
   private:

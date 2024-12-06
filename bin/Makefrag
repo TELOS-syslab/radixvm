@@ -63,6 +63,7 @@ UPROGS_BIN= \
 	s_munmap_r \
 	mmap_fork \
 	mmap_fork_e \
+	s_mem \
 	# vvsvtest \
 
 ifeq ($(HAVE_LWIP),y)

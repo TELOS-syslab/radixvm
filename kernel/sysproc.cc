@@ -156,6 +156,13 @@ sys_pt_pages(void)
   return myproc()->vmap->internal_pages();
 }
 
+//SYSCALL
+long
+sys_radix_size(void)
+{
+  return myproc()->vmap->radix_tree_size();
+}
+
 //SYSCALL NORET
 void
 sys_halt(void)

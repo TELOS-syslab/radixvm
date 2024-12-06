@@ -162,6 +162,8 @@ struct vmap {
   // Report the number of internal pages used by the page map cache.
   u64 internal_pages() const { return cache.internal_pages(); }
 
+  u64 radix_tree_size() { return vpfs_.total_size(); }
+
   // Set write permission bit in vmdesc
   int set_write_permission(uptr start, uptr len, bool is_readonly = false);
 
