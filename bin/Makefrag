@@ -61,6 +61,7 @@ UPROGS_BIN= \
 	s_pf_r \
 	s_munmap_d \
 	s_munmap_r \
+	s_munmap_v \
 	s_mem \
 
 ifeq ($(HAVE_LWIP),y)

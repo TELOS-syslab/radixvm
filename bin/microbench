@@ -12,6 +12,10 @@ echo "scale_munmap_rand"
 ./s_munmap_r
 sleep 5
 
+echo "scale_munmap_virt"
+./s_munmap_v
+sleep 5
+
 echo "scale_pf_dist"
 ./s_pf_d
 sleep 5
