@@ -2,6 +2,8 @@
 
 #define NUM_MMAPS 512 // Number mmaps per thread
 
+char * const base = (char*)0x100000000UL;
+
 void *worker_thread(void *arg)
 {
 	thread_data_t *data = (thread_data_t *)arg;
@@ -19,9 +21,10 @@ void *worker_thread(void *arg)
 	tsc_start = rdtsc();
 
 	// map them one by one
+	char *p = base + (size_t)data->thread_id * NUM_MMAPS * 8 * 0x100000;
 	for (size_t i = 0; i < NUM_MMAPS; i++) {
-		mmap(0, PAGE_SIZE * 8, PROT_READ | PROT_WRITE,
-				 MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
+		mmap((char*)(p + i * PAGE_SIZE * 8), PAGE_SIZE * 8, PROT_READ | PROT_WRITE,
+				 MAP_PRIVATE | MAP_FIXED | MAP_ANONYMOUS, -1, 0);
 	}
 
 	tsc_end = rdtsc();
