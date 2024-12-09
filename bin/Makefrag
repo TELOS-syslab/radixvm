@@ -57,6 +57,7 @@ UPROGS_BIN= \
 	tee \
         ln \
 	s_mmap \
+	s_mmap_pf \
 	s_pf_d \
 	s_pf_r \
 	s_munmap_d \
