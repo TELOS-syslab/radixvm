@@ -1,4 +1,4 @@
-#include "scale_common.h"
+#include "old_scale_common.h"
 
 #define NUM_PAGES 32 // Number of pages to unmap per thread
 
@@ -18,10 +18,10 @@ void *worker_thread(void *arg)
 
 	tsc_start = rdtsc();
 
-	// unmap them one by one randomly
-	int *page_idx = data->page_idx + data->thread_id * NUM_PAGES;
+	// unmap them one by one
+	char *region = data->region + data->thread_id * NUM_PAGES * PAGE_SIZE;
 	for (size_t i = 0; i < NUM_PAGES; i++) {
-		munmap(data->region + page_idx[i] * PAGE_SIZE, PAGE_SIZE);
+		munmap(region + i * PAGE_SIZE, PAGE_SIZE);
 	}
 
 	tsc_end = rdtsc();
@@ -37,6 +37,5 @@ int main(int argc, char *argv[])
 	return entry_point(argc, argv, worker_thread,
 			   (test_config_t){ .num_prealloc_pages_per_thread =
 						    NUM_PAGES,
-					    .trigger_fault_before_spawn = 1,
-					    .rand_assign_pages = 1 });
+					    .trigger_fault_before_spawn = 1, .rand_assign_pages = 0 });
 }

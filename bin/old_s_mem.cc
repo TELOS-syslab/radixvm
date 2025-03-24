@@ -100,11 +100,13 @@ void *worker_thread(void *arg)
         data->region[i * PAGE_SIZE] = 1;
 	}
 
-	pthread_barrier_wait(&bar0);
+    pthread_barrier_wait(&bar0);
     if (data->thread_id == 0) {
         printf("%d, %lu, %lu\n", data->num_threads, pt_pages(), radix_size());
     }
 	pthread_barrier_wait(&bar1);
+
+	// Barrier at here. Output pagetable size and vma tree size.
 
 	return NULL;
 }

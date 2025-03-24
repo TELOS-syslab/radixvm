@@ -1,4 +1,4 @@
-#include "scale_common.h"
+#include "old_scale_common.h"
 
 #define NUM_PAGES 1024 // Number of pages to unmap per thread
 

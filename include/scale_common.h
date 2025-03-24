@@ -68,34 +68,72 @@ unsigned int simple_get_rand(unsigned int last_rand)
 
 size_t up_align(size_t size, size_t alignment)
 {
-	return ((size) + ((alignment) - 1)) & ~((alignment) - 1);
+	return ((size) + ((alignment)-1)) & ~((alignment)-1);
 }
 
 #define PAGE_SIZE 4096 // Typical page size in bytes
 // Single thread test, will be executed 4096 times;
 // 8 thread test will be executed 512 times;
-// 128 thread test will be excuted 32 times, etc.
+// 128 thread test will be executed 32 times, etc.
 // Statistics are per-thread basis.
 #define TOT_THREAD_RUNS 4096
 
+char *const BASE_PTR = (char *)0x100000000UL;
+
 #define RESULT_FILE "results"
 
+static pthread_barrier_t bar, bar0, bar1;
+
+#define thread_start()                                                     \
+	thread_data_t *data = (thread_data_t *)arg;                        \
+    if (setaffinity(get_cpu_order(data->thread_id)) < 0) {             \
+		die("setaffinity err");                                        \
+		exit(EXIT_FAILURE);                                            \
+	}                                                                  \
+	long tsc_start, tsc_end;                                           \
+    /* Wait for that all threads are ready */                          \
+	pthread_barrier_wait(&bar);                                        \
+	tsc_start = rdtsc();
+
+#define thread_end(num_requests)                               \
+	tsc_end = rdtsc();                                     \
+	long tot_time = get_time_in_nanos(tsc_start, tsc_end); \
+	data->lat = tot_time / (num_requests);                 \
+	return NULL;
+
 typedef struct {
-	char *region;
-	// For random tests
-	int *page_idx;
+	char *base;
+	long *offset;
 	int thread_id;
-	// Pass the result back to the main thread
+	int tot_threads;
+	int is_unfixed_mmap_test;
+
+	// Pass the latency(ns) result back to the main thread
 	long lat;
 } thread_data_t;
 
-static pthread_barrier_t bar;
+typedef struct {
+	// Only for mem usage tests
+	size_t num_total_pages;
+
+	// Only for time usage tests
+	size_t num_requests_per_thread;
+	size_t num_pages_per_request;
+	int mmap_before_spawn;
+	int trigger_fault_before_spawn;
+	int multi_vma_assign_requests;
+	int contention_level;
+	int is_unfixed_mmap_test;
+} test_config_t;
+
+const char contention_level_name[3][20] = { "LOW_CONTENTION", "MID_CONTENTION",
+					    "HIGH_CONTENTION" };
 
 typedef struct {
-	size_t num_prealloc_pages_per_thread;
-	int trigger_fault_before_spawn;
-	int rand_assign_pages;
-} test_config_t;
+	long avglat;
+	long medlat;
+	long p99lat;
+} latency_result_t;
 
 // Decls
 
@@ -103,8 +141,10 @@ int entry_point(int argc, char *argv[], void *(*worker_thread)(void *),
 		test_config_t config);
 void run_test_specify_threads(int num_threads, void *(*worker_thread)(void *),
 			      test_config_t config);
+void run_test_and_print(int num_threads, void *(*worker_thread)(void *),
+			test_config_t config);
 void run_test_specify_rounds(int num_threads, void *(*worker_thread)(void *),
-			     test_config_t config);
+			     test_config_t config, latency_result_t *result);
 void run_test_forked(int num_threads, void *(*worker_thread)(void *),
 		     test_config_t config);
 void run_test(int num_threads, void *(*worker_thread)(void *),
@@ -133,17 +173,36 @@ int entry_point(int argc, char *argv[], void *(*worker_thread)(void *),
 void run_test_specify_threads(int num_threads, void *(*worker_thread)(void *),
 			      test_config_t config)
 {
-	printf("Threads, p5 lat (ns), Avg lat (ns), p95 lat (ns), Pos err lat (ns2), Neg err lat (ns2)\n");
+	printf("Threads, Avg Lat (ns), Med Lat (ns), p99 Lat (ns)\n");
+
+	// We don't have sched_getaffinity, so we simply set num_cpus to 128.
+	// cpu_set_t cpuset;
+	// if (sched_getaffinity(0, sizeof(cpu_set_t), &cpuset) != 0) {
+	// 	perror("sched_getaffinity failed");
+	// 	exit(EXIT_FAILURE);
+	// }
+	// int num_cpus = CPU_COUNT(&cpuset);
+	int num_cpus = 128;
 
 	if (num_threads == -1) {
 		int threads[] = { 1, 2, 4, 8, 16, 32, 48, 64, 80, 96, 112, 128 };
 		for (int i = 0; i < sizeof(threads) / sizeof(int); i++) {
-			run_test_specify_rounds(threads[i], worker_thread,
-						config);
+			if (threads[i] > num_cpus)
+				break;
+			run_test_and_print(threads[i], worker_thread, config);
 		}
 	} else {
-		run_test_specify_rounds(num_threads, worker_thread, config);
+		run_test_and_print(num_threads, worker_thread, config);
 	}
+}
+
+void run_test_and_print(int num_threads, void *(*worker_thread)(void *),
+			test_config_t config)
+{
+	latency_result_t result;
+	run_test_specify_rounds(num_threads, worker_thread, config, &result);
+	printf("%d, %ld, %ld, %ld\n", num_threads, result.avglat, result.medlat,
+	       result.p99lat);
 }
 
 pthread_t threads[TOT_THREAD_RUNS];
@@ -151,7 +210,7 @@ thread_data_t thread_data[TOT_THREAD_RUNS];
 long thread_lat[TOT_THREAD_RUNS];
 
 void run_test_specify_rounds(int num_threads, void *(*worker_thread)(void *),
-			  test_config_t config)
+			     test_config_t config, latency_result_t *result)
 {
 	unlink(RESULT_FILE);
 
@@ -160,7 +219,7 @@ void run_test_specify_rounds(int num_threads, void *(*worker_thread)(void *),
 		run_test_forked(num_threads, worker_thread, config);
 	}
 
-	// Read latency data from RESULT_FILE
+	// Read latencies data from RESULT_FILE
     int fd = open(RESULT_FILE, O_RDONLY);
 	if (fd == -1) {
 		die("open failed");
@@ -182,35 +241,19 @@ void run_test_specify_rounds(int num_threads, void *(*worker_thread)(void *),
 	}
 	close(fd);
 
-	if (tot_runs != num_threads * runs) {
+    if (tot_runs != num_threads * runs) {
 		die("Incorrect number of runs");
 		exit(EXIT_FAILURE);
 	}
 
-	// Calculate the p5, average, p95, and variance of the latencies
-	long avg = 0;
-	for (int i = 0; i < tot_runs; i++) {
-		avg += thread_lat[i];
-	}
-	avg /= tot_runs;
-	long posvar2 = 0;
-	long numpos = 0;
-	long negvar2 = 0;
-	long numneg = 0;
-	for (int i = 0; i < tot_runs; i++) {
-		long diff = thread_lat[i] - avg;
-		if (diff > 0) {
-			posvar2 += diff * diff;
-			numpos++;
-		} else {
-			negvar2 += diff * diff;
-			numneg++;
-		}
-	}
-	posvar2 /= numpos;
-	negvar2 /= numneg;
+	long avglat = 0, medlat = 0, p99lat = 0;
 
-	// Calculate the p5 and p95 latencies
+	for (int i = 0; i < tot_runs; i++) {
+		avglat += thread_lat[i];
+	}
+	avglat /= tot_runs;
+
+	// Calculate the p99 lat
 	// bubble sort
 	for (int i = 0; i < tot_runs; i++) {
 		for (int j = i + 1; j < tot_runs; j++) {
@@ -221,11 +264,14 @@ void run_test_specify_rounds(int num_threads, void *(*worker_thread)(void *),
 			}
 		}
 	}
-	long p5 = thread_lat[tot_runs / 20];
-	long p95 = thread_lat[tot_runs * 19 / 20];
+	medlat = thread_lat[tot_runs / 2];
+	p99lat = thread_lat[tot_runs * 99 / 100];
 
-	printf("%d, %ld, %ld, %ld, %ld, %ld\n", num_threads, p5, avg, p95,
-	       posvar2, negvar2);
+	result->avglat = avglat;
+	result->medlat = medlat;
+	result->p99lat = p99lat;
+
+	return;
 }
 
 void run_test_forked(int num_threads, void *(*worker_thread)(void *),
@@ -247,58 +293,136 @@ void run_test_forked(int num_threads, void *(*worker_thread)(void *),
 }
 
 void run_test(int num_threads, void *(*worker_thread)(void *),
-	      test_config_t config)
+	      test_config_t cfg)
 {
-	size_t num_prealloc_pages = config.num_prealloc_pages_per_thread;
-	size_t num_tot_pages = num_prealloc_pages * num_threads;
-	int trigger_fault_before_spawn = config.trigger_fault_before_spawn;
-	int rand_assign_pages = config.rand_assign_pages;
+	char *base = NULL;
+	long *offset = NULL;
 
 	pthread_barrier_init(&bar, 0, num_threads);
 
-	char *region = (char *)mmap(0, num_tot_pages * PAGE_SIZE,
+	if (cfg.num_total_pages != 0) {
+        // Memory usage tests
+        pthread_barrier_init(&bar0, 0, num_threads);
+        pthread_barrier_init(&bar1, 0, num_threads);
+
+		base = (char *)mmap(NULL, cfg.num_total_pages * PAGE_SIZE,
 			    PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS,
 			    -1, 0);
-
-	if (region == MAP_FAILED) {
-		die("mmap failed");
-		exit(EXIT_FAILURE);
-	}
-
-	if (trigger_fault_before_spawn) {
-		// Trigger page faults before spawning threads
-		for (int i = 0; i < num_tot_pages; i++) {
-			region[i * PAGE_SIZE] = 1;
+		if (base == MAP_FAILED) {
+			die("mmap failed");
+			exit(EXIT_FAILURE);
 		}
-	}
+	} else {
+		// Time usage tests
+		size_t num_tot_requests =
+			cfg.num_requests_per_thread * num_threads;
 
-	int *page_idx = NULL;
-	int page_idx_size = 0;
-	if (rand_assign_pages) {
-		page_idx_size =
-			up_align(num_tot_pages * sizeof(int), PAGE_SIZE);
-		page_idx = (int *)mmap(0, page_idx_size, PROT_READ | PROT_WRITE,
-				MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
-		for (int i = 0; i < num_tot_pages; i++) {
-			page_idx[i] = i;
+		int offset_size =
+			up_align(num_tot_requests * sizeof(long), PAGE_SIZE);
+		offset = (long *)mmap(NULL, offset_size, PROT_READ | PROT_WRITE,
+			      MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
+		if (offset == MAP_FAILED) {
+			die("mmap failed");
+			exit(EXIT_FAILURE);
 		}
 
-		// Random shuffle
-		unsigned int rand = 0xdeadbeef - num_threads;
-		for (int i = num_tot_pages - 1; i > 0; i--) {
-			rand = simple_get_rand(rand);
-			int j = rand % (i + 1);
-			int temp = page_idx[i];
-			page_idx[i] = page_idx[j];
-			page_idx[j] = temp;
+		unsigned long reserved_region_size =
+			cfg.num_pages_per_request * PAGE_SIZE;
+
+		for (int i = 0; i < num_tot_requests; i++) {
+			offset[i] = i * reserved_region_size;
+		}
+
+		if (cfg.mmap_before_spawn) {
+			// munmap or pagefault tests
+			if (cfg.multi_vma_assign_requests) {
+				// Each request is in a VMA
+				base = BASE_PTR;
+				for (int i = 0; i < num_tot_requests; i++) {
+					char *temp =
+						(char *)mmap(base + offset[i],
+						     reserved_region_size,
+						     PROT_READ | PROT_WRITE,
+						     MAP_PRIVATE | MAP_FIXED |
+							     MAP_ANONYMOUS,
+						     -1, 0);
+					if (temp == MAP_FAILED) {
+						die("mmap failed");
+						exit(EXIT_FAILURE);
+					}
+				}
+			} else {
+				// All requests are in one VMA
+				base = (char *)mmap(NULL,
+					    num_tot_requests *
+						    reserved_region_size,
+					    PROT_READ | PROT_WRITE,
+					    MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
+				if (base == MAP_FAILED) {
+					die("mmap failed");
+					exit(EXIT_FAILURE);
+				}
+			}
+
+			if (cfg.trigger_fault_before_spawn) {
+				// Trigger page faults before spawning threads
+				for (int i = 0; i < num_tot_requests; i++) {
+					char *region = base + offset[i];
+					for (int j = 0;
+					     j < cfg.num_pages_per_request; j++)
+						region[j * PAGE_SIZE] = 1;
+				}
+			}
+		} else {
+			// mmap tests
+			if (cfg.is_unfixed_mmap_test) {
+				base = NULL;
+			} else {
+				base = BASE_PTR;
+			}
+		}
+
+		if (cfg.contention_level == 0) {
+			// Low Contention
+			// Do nothing.
+		} else if (cfg.contention_level == 1) {
+			// Medium Contention
+			// Random shuffle
+			unsigned int rand = 0xdeadbeef - num_threads;
+			for (int i = num_tot_requests - 1; i > 0; i--) {
+				rand = simple_get_rand(rand);
+				int j = rand % (i + 1);
+				long temp = offset[i];
+				offset[i] = offset[j];
+				offset[j] = temp;
+			}
+		} else if (cfg.contention_level == 2) {
+			// High Contention
+			for (int i = 0; i < num_threads; i++) {
+				int idx = i;
+				for (int j = i * cfg.num_requests_per_thread;
+				     j < (i + 1) * cfg.num_requests_per_thread;
+				     j++) {
+					offset[j] = idx * reserved_region_size;
+					idx += num_threads;
+				}
+			}
+		} else {
+			die("Invalid Contention Level");
+			exit(EXIT_FAILURE);
 		}
 	}
 
 	// Create threads and trigger page faults in parallel
 	for (int i = 0; i < num_threads; i++) {
-		thread_data[i].region = region;
-		thread_data[i].page_idx = page_idx;
+		thread_data[i].base = base;
+		if (offset != NULL) {
+			thread_data[i].offset =
+				offset + i * cfg.num_requests_per_thread;
+		}
 		thread_data[i].thread_id = i;
+		thread_data[i].tot_threads = num_threads;
+		thread_data[i].is_unfixed_mmap_test = cfg.is_unfixed_mmap_test;
 
 		if (xthread_create(&threads[i], 0, worker_thread,
 				   &thread_data[i]) != 0) {
@@ -312,12 +436,7 @@ void run_test(int num_threads, void *(*worker_thread)(void *),
 		xpthread_join(threads[i]);
 	}
 
-	// munmap(region, num_tot_pages * PAGE_SIZE);
-	// if (rand_assign_pages) {
-	// 	munmap(page_idx, page_idx_size);
-	// }
-
-	// Write latency data to RESULT_FILE
+	// Write latencies data to RESULT_FILE
     int fd = open(RESULT_FILE, O_RDWR | O_APPEND | O_CREAT, 0666);
 	if (fd == -1) {
 		die("open failed");

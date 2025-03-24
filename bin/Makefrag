@@ -56,14 +56,21 @@ UPROGS_BIN= \
 	base64 \
 	tee \
         ln \
+	s_mem_usage \
 	s_mmap \
 	s_mmap_pf \
-	s_pf_d \
-	s_pf_r \
-	s_munmap_d \
-	s_munmap_r \
-	s_munmap_v \
-	s_mem \
+	s_munmap \
+	s_munmap_virt \
+	s_pf \
+	#	\
+	old_s_mmap \
+	old_s_mmap_pf \
+	old_s_pf_d \
+	old_s_pf_r \
+	old_s_munmap_d \
+	old_s_munmap_r \
+	old_s_munmap_v \
+	old_s_mem \
 
 ifeq ($(HAVE_LWIP),y)
 UPROGS_BIN += \

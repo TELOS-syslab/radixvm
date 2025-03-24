@@ -1,6 +1,8 @@
-#include "scale_common.h"
+#include "old_scale_common.h"
 
-#define NUM_PAGES 1024 // Number of pages to allocate per thread for mmap
+#define NUM_MMAPS 512 // Number mmaps per thread
+
+char * const base = (char*)0x100000000UL;
 
 void *worker_thread(void *arg)
 {
@@ -18,15 +20,17 @@ void *worker_thread(void *arg)
 
 	tsc_start = rdtsc();
 
-	char *region = data->region + data->thread_id * NUM_PAGES * PAGE_SIZE;
-	for (size_t i = 0; i < NUM_PAGES; i++) {
-		region[i * PAGE_SIZE] = 1; // Trigger page fault
+	// map them one by one
+	char *p = base + (size_t)data->thread_id * NUM_MMAPS * 8 * 0x100000;
+	for (size_t i = 0; i < NUM_MMAPS; i++) {
+		mmap((char*)(p + i * PAGE_SIZE * 8), PAGE_SIZE * 8, PROT_READ | PROT_WRITE,
+				 MAP_PRIVATE | MAP_FIXED | MAP_ANONYMOUS, -1, 0);
 	}
 
 	tsc_end = rdtsc();
 	long tot_time = get_time_in_nanos(tsc_start, tsc_end);
 
-	data->lat = tot_time / NUM_PAGES;
+	data->lat = tot_time / NUM_MMAPS;
 
 	return NULL;
 }
@@ -34,7 +38,6 @@ void *worker_thread(void *arg)
 int main(int argc, char *argv[])
 {
 	return entry_point(argc, argv, worker_thread,
-			   (test_config_t){ .num_prealloc_pages_per_thread =
-						    NUM_PAGES,
+			   (test_config_t){ .num_prealloc_pages_per_thread = 1,
 					    .trigger_fault_before_spawn = 0, .rand_assign_pages = 0 });
 }

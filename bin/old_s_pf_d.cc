@@ -1,4 +1,4 @@
-#include "scale_common.h"
+#include "old_scale_common.h"
 
 #define NUM_PAGES 1024 // Number of pages to allocate per thread for mmap
 
@@ -18,11 +18,9 @@ void *worker_thread(void *arg)
 
 	tsc_start = rdtsc();
 
-	int *page_idx = data->page_idx + data->thread_id * NUM_PAGES;
+	char *region = data->region + data->thread_id * NUM_PAGES * PAGE_SIZE;
 	for (size_t i = 0; i < NUM_PAGES; i++) {
-		char *region = data->region + page_idx[i] * PAGE_SIZE;
-		// Trigger page fault
-		region[0] = 1;
+		region[i * PAGE_SIZE] = 1; // Trigger page fault
 	}
 
 	tsc_end = rdtsc();
@@ -36,6 +34,7 @@ void *worker_thread(void *arg)
 int main(int argc, char *argv[])
 {
 	return entry_point(argc, argv, worker_thread,
-			   (test_config_t){ .num_prealloc_pages_per_thread = NUM_PAGES,
-					    .trigger_fault_before_spawn = 0, .rand_assign_pages = 1 });
+			   (test_config_t){ .num_prealloc_pages_per_thread =
+						    NUM_PAGES,
+					    .trigger_fault_before_spawn = 0, .rand_assign_pages = 0 });
 }
