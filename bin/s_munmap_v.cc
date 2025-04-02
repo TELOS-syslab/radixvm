@@ -1,15 +1,14 @@
 #include "scale_common.h"
 
-#define NUM_PAGES 32 // Number of pages to allocate per thread for mmap
-#define NUM_PAGES_PAD (512 - NUM_PAGES)
+#define NUM_PAGES 32 // Number of pages to unmap per thread
 
 void *worker_thread(void *arg)
 {
 	thread_start();
 
-	// Trigger page fault one by one
+	// unmap them one by one
 	for (size_t i = 0; i < NUM_PAGES; i++) {
-		data->base[data->offset[i]] = 1;
+		munmap(data->base + data->offset[i], PAGE_SIZE);
 		request_end();
 	}
 
@@ -32,13 +31,16 @@ int main(int argc, char *argv[])
 		num_threads = -1;
 	}
 
-	printf("***PF %s***\n", contention_level_name[contention_level]);
+	size_t num_pages_pad = (3 - contention_level) * 256 - NUM_PAGES;
+
+	printf("***MUNMAP_VIRT %s***\n",
+	       contention_level_name[contention_level]);
 	run_test_specify_threads(
 		num_threads, worker_thread,
 		(test_config_t){ .num_total_pages = 0,
-				 .num_requests_per_thread = NUM_PAGES,
+				  .num_requests_per_thread = NUM_PAGES,
 				 .num_pages_per_request = 1,
-				 .num_pages_pad = NUM_PAGES_PAD,
+				 .num_pages_pad = num_pages_pad,
 				 .mmap_before_spawn = 1,
 				 .trigger_fault_before_spawn = 0,
 				 .contention_level = contention_level,

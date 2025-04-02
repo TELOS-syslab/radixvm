@@ -119,7 +119,7 @@ xapic_lapic::cpu_init()
 {
   u64 count;
 
-  verbose.println("xapic: Initializing LAPIC (CPU ", myid(), ")");
+  // verbose.println("xapic: Initializing LAPIC (CPU ", myid(), ")");
 
   // Enable local APIC, do not suppress EOI broadcast, set spurious
   // interrupt vector.
@@ -127,8 +127,8 @@ xapic_lapic::cpu_init()
 
   if (xapichz == 0) {
     // Measure the TICR frequency
-    xapicw(TDCR, X1);    
-    xapicw(TICR, 0xffffffff); 
+    xapicw(TDCR, X1);
+    xapicw(TICR, 0xffffffff);
     u64 ccr0 = xapicr(TCCR);
     microdelay(10 * 1000);    // 1/100th of a second
     u64 ccr1 = xapicr(TCCR);
@@ -140,10 +140,10 @@ xapic_lapic::cpu_init()
     panic("initxapic: QUANTUM too large");
 
   // The timer repeatedly counts down at bus frequency
-  // from xapic[TICR] and then issues an interrupt.  
+  // from xapic[TICR] and then issues an interrupt.
   xapicw(TDCR, X1);
   xapicw(TIMER, PERIODIC | (T_IRQ0 + IRQ_TIMER));
-  xapicw(TICR, count); 
+  xapicw(TICR, count);
 
   // Disable logical interrupt lines.
   xapicw(LINT0, MASKED);
@@ -220,7 +220,7 @@ xapic_lapic::start_ap(struct cpu *c, u32 addr)
 
   // "Universal startup algorithm."
   // Send INIT (level-triggered) interrupt to reset other CPU.
-  
+
 
   xapicw(ICRHI, c->hwid.num<<24);
   xapicw(ICRLO, INIT | LEVEL | ASSERT);
@@ -229,7 +229,7 @@ xapic_lapic::start_ap(struct cpu *c, u32 addr)
   xapicw(ICRLO, INIT | LEVEL);
   xapicwait();
   microdelay(10000);    // should be 10ms, but too slow in Bochs!
-  
+
   // Send startup IPI (twice!) to enter bootstrap code.
   // Regular hardware is supposed to only accept a STARTUP
   // when it is in the halted state due to an INIT.  So the second

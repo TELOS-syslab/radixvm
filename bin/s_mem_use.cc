@@ -12,6 +12,7 @@ void *worker_thread(void *arg)
 	for (size_t i = 0; i < num_pages_per_thread; i++) {
 		data->base[(data->thread_id * num_pages_per_thread + i) *
 			   PAGE_SIZE] = 1;
+		request_end();
 	}
 
     // Barrier at here. Output pagetable size and vma tree size.
@@ -21,27 +22,22 @@ void *worker_thread(void *arg)
     }
 	pthread_barrier_wait(&bar1);
 
-	thread_end(num_pages_per_thread);
+	return NULL;
 }
 
 int main(int argc, char *argv[])
 {
 	printf("***MEM_USAGE_SIM***\n");
 
-	test_config_t config;
-	config.num_total_pages = NUM_PAGES;
-	config.num_requests_per_thread = 0;
-	config.num_pages_per_request = 0;
-	config.mmap_before_spawn = 0;
-	config.trigger_fault_before_spawn = 0;
-	config.multi_vma_assign_requests = 0;
-	config.contention_level = 0;
-	config.is_unfixed_mmap_test = 0;
-
-	int ret = entry_point(argc, argv, worker_thread, config);
-	if (ret != 0) {
-		die("entry_point failed");
-		exit(EXIT_FAILURE);
-	}
+	run_test_specify_threads(384, worker_thread,
+				 (test_config_t){ .num_total_pages = NUM_PAGES,
+						  .num_requests_per_thread = 0,
+						  .num_pages_per_request = 0,
+						  .num_pages_pad = 0,
+						  .mmap_before_spawn = 0,
+						  .trigger_fault_before_spawn =
+							  0,
+						  .contention_level = 0,
+						  .is_unfixed_mmap_test = 0 });
 	printf("\n");
 }

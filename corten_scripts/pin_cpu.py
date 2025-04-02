@@ -26,7 +26,6 @@ def pin_proc(pid, core):
 
 # 1 --> port number
 # 2 --> number of vcpus
-
 query = qmp.QMPQuery("localhost:%s" % (sys.argv[1]))
 print(query.cmd("query-cpus-fast"))
 response = query.cmd("query-cpus-fast")['return']

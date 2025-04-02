@@ -6,7 +6,7 @@
 #include "percpu.hh"
 
 namespace {
-  weakcache<u64, mnode, 257> mnode_cache;
+  weakcache<u64, mnode, 513> mnode_cache;
   DEFINE_PERCPU(u64, next_inumber);
 };
 
@@ -14,7 +14,7 @@ struct inumber
 {
   u64 v_;
   static const int type_bits = 4;
-  static const int cpu_bits = 8;
+  static const int cpu_bits = 9;
 
   inumber(u64 v) : v_(v) {}
   inumber(u8 type, u64 cpu, u64 count)

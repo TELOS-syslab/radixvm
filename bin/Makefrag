@@ -56,11 +56,11 @@ UPROGS_BIN= \
 	base64 \
 	tee \
         ln \
-	s_mem_usage \
+	s_mem_use \
 	s_mmap \
 	s_mmap_pf \
 	s_munmap \
-	s_munmap_virt \
+	s_munmap_v \
 	s_pf \
 	#	\
 	old_s_mmap \

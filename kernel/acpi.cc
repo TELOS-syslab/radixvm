@@ -355,7 +355,7 @@ initcpus_acpi(void)
     auto c = &cpus[cpuid];
     c->id = cpuid;
     c->hwid = HWID(cpu_id_to_apicid[cpuid]);
-    verbose.println("acpi: CPU ", c->id, " APICID ", c->hwid.num);
+    // verbose.println("acpi: CPU ", c->id, " APICID ", c->hwid.num);
   }
 
   // Associate CPUs with NUMA nodes
