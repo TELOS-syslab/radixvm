@@ -99,10 +99,10 @@ x2apic_lapic::start_ap(struct cpu *c, u32 addr)
   // Be paranoid about clearing APIC errors
   writemsr(ESR, 0);
   readmsr(ESR);
-  
+
   unsigned long accept_status;
   int maxlvt = x2apicmaxlvt();
- 
+
   if (maxlvt > 3)
     writemsr(ESR, 0);
   readmsr(ESR);
@@ -184,7 +184,7 @@ x2apic_lapic::clearintr()
     queued = 0;
     for (i = ISR_NR - 1; i >= 0; i--)
       queued |= readmsr(IRR + i*0x1);
-    
+
     for (i = ISR_NR - 1; i >= 0; i--) {
       value = readmsr(ISR + i*0x1);
       for (j = 31; j >= 0; j--) {
@@ -212,7 +212,7 @@ x2apic_lapic::cpu_init()
   u32 value;
   int maxlvt;
 
-  verbose.println("x2apic: Initializing LAPIC (CPU ", myid(), ")");
+  // verbose.println("x2apic: Initializing LAPIC (CPU ", myid(), ")");
 
   // Enable interrupts on the APIC (but not on the processor).
   value = readmsr(TPR);
@@ -255,8 +255,8 @@ x2apic_lapic::cpu_init()
 
   if (x2apichz == 0) {
     // Measure the TICR frequency
-    writemsr(TDCR, X1);    
-    writemsr(TICR, 0xffffffff); 
+    writemsr(TDCR, X1);
+    writemsr(TICR, 0xffffffff);
     u64 ccr0 = readmsr(TCCR);
     microdelay(10 * 1000);    // 1/100th of a second
     u64 ccr1 = readmsr(TCCR);
@@ -268,10 +268,10 @@ x2apic_lapic::cpu_init()
     panic("initx2apic: QUANTUM too large");
 
   // The timer repeatedly counts down at bus frequency
-  // from xapic[TICR] and then issues an interrupt.  
+  // from xapic[TICR] and then issues an interrupt.
   writemsr(TDCR, X1);
   writemsr(TIMER, PERIODIC | (T_IRQ0 + IRQ_TIMER));
-  writemsr(TICR, count); 
+  writemsr(TICR, count);
 
   // Clear error status register (requires back-to-back writes).
   writemsr(ESR, 0);

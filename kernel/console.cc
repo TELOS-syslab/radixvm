@@ -230,6 +230,7 @@ kerneltrap(struct trapframe *tf)
   __cprintf("kernel ");
   printtrap(tf, false);
   printtrace(tf->rbp);
+  __cprintf("Abort.\n");
 
   panicked = 1;
   halt();
